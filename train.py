@@ -42,6 +42,7 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         super().__init__(env)
         self.count = 0
         self.max_steps = 2000
+        self.last_observations = last_observations
         self.num_intervals = 5  # Number of intervals you want
         self.scales = [1, 3, 7, 10]  # Corresponding scales for the random values
         
