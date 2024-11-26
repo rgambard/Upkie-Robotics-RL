@@ -120,8 +120,17 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
 
         #reward = self.modify_reward(reward)
         
+        obs, reward, done, truncated, info = self.env.step(action)
+        obs_flat = obs.flatten() if obs.ndim > 1 else obs
+
+        # Update the observation buffer
+        self._prev_observation.pop(0)
+        self._prev_observation.append(obs_flat)
+
+        new_observation = np.array(self._prev_observation).flatten()
+        
         self.count += 1
-        return obs, reward, done, truncated, info
+        return new_observation, reward, done, truncated, info
     
     def _get_force_for_step(self):
         """
