@@ -38,15 +38,33 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
     This wrapper allows you to modify or log observations, rewards,
     or interactions with the environment.
     """
-    def __init__(self, env):
+    def __init__(self, env, last_observations: int = 10):
         super().__init__(env)
         self.count = 0
-        self.force_schedule = [
-            (0, 1000, [0.0, 0.0, 0.0]),
-            (1001, 5000, [np.random.normal(loc=0,scale=2), 0.0, 0.0]), 
-            (5001, 10000, [np.random.normal(loc=0,scale=5), 0.0, 0.0]),
-            (10001, 20000, [np.random.normal(loc=0,scale=10), 0.0, 0.0]) 
-        ]
+        self.observation_space = gym.spaces.Box(-np.inf,np.inf,(4*last_observations,),np.float64)
+        self._prev_observation = [np.zeros(4)]*last_observations
+        self.max_steps = 2000
+        self.num_intervals = 5  # Number of intervals you want
+        self.scales = [1, 3, 7, 10]  # Corresponding scales for the random values
+        
+        obs_dim = np.prod(env.observation_space.shape)
+        self.observation_space = gymnasium.spaces.Box(
+            -np.inf, np.inf, (obs_dim * last_observations,), dtype=np.float64
+        )
+        self._prev_observation = [np.zeros(obs_dim)] * last_observations
+
+        # Randomly generate interval boundaries
+        boundaries = sorted(np.random.choice(range(1, self.max_steps), self.num_intervals - 1, replace=False))
+        boundaries = [0] + boundaries + [self.max_steps]
+
+        # Generate the force schedule with random steps
+        self.force_schedule = []
+        for i in range(len(boundaries) - 1):
+            start = boundaries[i]
+            end = boundaries[i + 1] - 1
+            scale = self.scales[min(i, len(self.scales) - 1)]  # Choose scale based on interval index
+            force = [np.random.normal(loc=0, scale=scale), 0.0, 0.0]
+            self.force_schedule.append((start, end, force))
 
     def reset(self, **kwargs):
         """
@@ -54,13 +72,28 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         """
         obs, info = self.env.reset(**kwargs)
         self.count = 0
-        self.force_schedule = [
-            (0, 1000, [0.0, 0.0, 0.0]),
-            (1001, 2000, [np.random.normal(loc=0,scale=1), 0.0, 0.0]), 
-            (2001, 3000, [np.random.normal(loc=0,scale=3), 0.0, 0.0]),
-            (3001, 5000, [np.random.normal(loc=0,scale=10), 0.0, 0.0]) 
-        ]
-        return obs, info
+        
+        obs_flat = obs.flatten() if obs.ndim > 1 else obs
+
+        # Initialize the observation buffer with zeros
+        self._prev_observation = [np.zeros_like(obs_flat)] * self.last_observations
+        self._prev_observation.pop(0)
+        self._prev_observation.append(obs_flat)
+
+        new_observation = np.array(self._prev_observation).flatten()
+        
+        boundaries = sorted(np.random.choice(range(1, self.max_steps), self.num_intervals - 1, replace=False))
+        boundaries = [0] + boundaries + [self.max_steps]
+
+        # Generate the force schedule with random steps
+        self.force_schedule = []
+        for i in range(len(boundaries) - 1):
+            start = boundaries[i]
+            end = boundaries[i + 1] - 1
+            scale = self.scales[min(i, len(self.scales) - 1)]  # Choose scale based on interval index
+            force = [np.random.normal(loc=0, scale=scale), 0.0, 0.0]
+            self.force_schedule.append((start, end, force))
+        return new_observation, info
     
     def apply_external_force(self,force):
         bullet_action = {
@@ -77,18 +110,15 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         """
         Execute a step in the environment and modify the results if needed.
         """
-        print(self.count)
-        obs, reward, done, truncated, info = self.env.step(action)
         
         force = self._get_force_for_step()
 
         # Apply the determined force to the robot
         self.apply_external_force(force)
-        print(force)
 
         obs, reward, done, truncated, info = self.env.step(action)
 
-        reward = self.modify_reward(reward)
+        #reward = self.modify_reward(reward)
         
         self.count += 1
         return obs, reward, done, truncated, info
