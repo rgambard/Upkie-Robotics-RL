@@ -38,7 +38,7 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
     This wrapper allows you to modify or log observations, rewards,
     or interactions with the environment.
     """
-    def __init__(self, env, last_observations: int = 10):
+    def __init__(self, env, last_observations: int = 5):
         super().__init__(env)
         self.count = 0
         self.max_steps = 2000
@@ -80,18 +80,6 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         self._prev_observation.append(obs_flat)
 
         new_observation = np.array(self._prev_observation).flatten()
-        
-        boundaries = sorted(np.random.choice(range(1, self.max_steps), self.num_intervals - 1, replace=False))
-        boundaries = [0] + boundaries + [self.max_steps]
-
-        # Generate the force schedule with random steps
-        self.force_schedule = []
-        for i in range(len(boundaries) - 1):
-            start = boundaries[i]
-            end = boundaries[i + 1] - 1
-            scale = self.scales[min(i, len(self.scales) - 1)]  # Choose scale based on interval index
-            force = [np.random.normal(loc=0, scale=scale), 0.0, 0.0]
-            self.force_schedule.append((start, end, force))
         return new_observation, info
     
     def apply_external_force(self,force):
@@ -119,7 +107,6 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
 
         #reward = self.modify_reward(reward)
         
-        obs, reward, done, truncated, info = self.env.step(action)
         obs_flat = obs.flatten() if obs.ndim > 1 else obs
 
         # Update the observation buffer
