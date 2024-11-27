@@ -38,17 +38,17 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
     This wrapper allows you to modify or log observations, rewards,
     or interactions with the environment.
     """
-    def __init__(self, env, last_observations: int = 5):
+    def __init__(self, env, last_observations: int = 2):
         super().__init__(env)
         self.count = 0
         self.max_steps = 2000
         self.last_observations = last_observations
         self.num_intervals = 5  # Number of intervals you want
-        self.scales = [1, 3, 7, 10]  # Corresponding scales for the random values
+        self.scales = [0, 2, 5, 7, 10]  # Corresponding scales for the random values
         
         obs_dim = np.prod(env.observation_space.shape)
         self.observation_space = gymnasium.spaces.Box(
-            -np.inf, np.inf, (obs_dim * last_observations,), dtype=np.float64
+            np.array(list(self.observation_space.low)*last_observations), np.array(list(self.observation_space.high)*last_observations), (obs_dim * last_observations,), dtype=np.float64
         )
         self._prev_observation = [np.zeros(obs_dim)] * last_observations
 
@@ -62,6 +62,7 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
             start = boundaries[i]
             end = boundaries[i + 1] - 1
             scale = self.scales[min(i, len(self.scales) - 1)]  # Choose scale based on interval index
+
             force = [np.random.normal(loc=0, scale=scale), 0.0, 0.0]
             self.force_schedule.append((start, end, force))
 
@@ -80,6 +81,19 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         self._prev_observation.append(obs_flat)
 
         new_observation = np.array(self._prev_observation).flatten()
+        
+        boundaries = sorted(np.random.choice(range(1, self.max_steps), self.num_intervals - 1, replace=False))
+        boundaries = [0] + boundaries + [self.max_steps]
+
+        # Generate the force schedule with random steps
+        self.force_schedule = []
+        for i in range(len(boundaries) - 1):
+            start = boundaries[i]
+            end = boundaries[i + 1] - 1
+            scale = self.scales[min(i, len(self.scales) - 1)]  # Choose scale based on interval index
+            force = [np.random.normal(loc=0, scale=scale), 0.0, 0.0]
+            self.force_schedule.append((start, end, force))
+        print(self.force_schedule)
         return new_observation, info
     
     def apply_external_force(self,force):
