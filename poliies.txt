@@ -3,3 +3,4 @@ aeneas : no forces, nbstepsmax = 1000
 expletives : curriculum learning with fixed times
 guessed : base policy without wrapper
 Spengler : base policy with wrapper
+misplace : curiculum learning v2 with longer episodes
