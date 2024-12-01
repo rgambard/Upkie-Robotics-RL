@@ -1,3 +1,5 @@
-jailor : no forces, nbstepsmax = 2000
+jailor : no forces, nbstepsmax = 2000 = base policy with wrapper
 aeneas : no forces, nbstepsmax = 1000
 expletives : curriculum learning with fixed times
+guessed : base policy without wrapper
+Spengler : base policy with wrapper
