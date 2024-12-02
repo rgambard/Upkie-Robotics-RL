@@ -17,7 +17,7 @@ import gymnasium
 import numpy as np
 import stable_baselines3
 import upkie.envs
-from envs import make_ppo_balancer_env
+from envs_s import make_ppo_balancer_env
 from rules_python.python.runfiles import runfiles
 from setting_s import EnvSettings, PPOSettings, TrainingSettings
 from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
@@ -46,6 +46,9 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         self.truncated = 0
         self.max_steps = 3000
         self.force_schedule = [[0,0,0],[0,0,0],[0,0,0]]
+        print(self.observation_space)
+        print(self.action_space)
+
         
 
 
@@ -55,37 +58,10 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         """
         if not self.truncated:
             print("truncated ! ")
-            print(self.force_schedule)
-        else: print("resisted",self.force_schedule)
+        else: print("resisted")
         obs, info = self.env.reset(**kwargs)
-        self.count = 0
-        self.scales = [0, 5, 0, 9, 0, 13, 0]  # Corresponding scales for the random values
-        self.num_intervals = 3  # Number of intervals you want
-        
-        
-        boundaries = sorted(np.random.choice(range(1, self.max_steps), self.num_intervals - 1, replace=False))
-        boundaries = [0,200,400,800, 1000, 1700, 1900, self.max_steps]
-
-
-        # Generate the force schedule with random steps
-        self.force_schedule = []
-        for i in range(len(boundaries) - 1):
-            start = boundaries[i]
-            end = boundaries[i + 1] - 1
-            scale = self.scales[min(i, len(self.scales) - 1)]  # Choose scale based on interval index
-            force = [np.clip(np.random.normal(loc=scale/3, scale=scale/2),-scale,scale), 0.0, 0.0]
-            self.force_schedule.append((start, end, force))
         return obs, info
     
-    def apply_external_force(self,force):
-        bullet_action = {
-            "external_forces": {
-                "torso": {
-                    "force": force,
-                    "local": False,
-                }
-            }
-        }
         self.env.bullet_extra(bullet_action)
 
     def step(self, action):
@@ -93,29 +69,14 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         Execute a step in the environment and modify the results if needed.
         """
         
-        force = self._get_force_for_step()
-
-        # Apply the determined force to the robot
-        self.apply_external_force(force)
-
         obs, reward, done, truncated, info = self.env.step(action)
 
-        reward = self.modify_reward(reward)
 
         self.count += 1
         self.counttotal+=1
         self.truncated = done
         return obs, reward, done, truncated, info
     
-    def _get_force_for_step(self):
-        """
-        Get the force to apply based on the current step from the force schedule.
-        """
-        for start_step, end_step, force in self.force_schedule:
-            if start_step <= self.count <= end_step:
-                return np.array(force)
-        return np.array([0.0, 0.0, 0.0])
-
     def modify_reward(self, reward):
         """
         Modify the reward before returning it.
@@ -274,13 +235,8 @@ def init_env(
             max_episode_steps=int(max_episode_duration * agent_frequency),
             frequency=agent_frequency,
             regulate_frequency=False,
-            reward=upkie.envs.rewards.WheeledInvertedPendulumReward(
-                position_weight=env_settings.reward["position_weight"],
-                velocity_weight=env_settings.reward["velocity_weight"],
-            ),
             shm_name=shm_name,
             spine_config=env_settings.spine_config,
-            max_ground_velocity=env_settings.max_ground_velocity,
         )
         velocity_env = VelocityEnvWrapper(velocity_env)
         velocity_env.reset(seed=seed)
@@ -470,7 +426,7 @@ def train_policy(
 if __name__ == "__main__":
     args = parse_command_line_arguments()
     agent_dir = os.path.dirname(__file__)
-    gin.parse_config_file(f"{agent_dir}/settings.gin")
+    gin.parse_config_file(f"{agent_dir}/setting_s.gin")
 
     training_path = os.environ.get(
         "UPKIE_TRAINING_PATH", tempfile.gettempdir()
