@@ -4,3 +4,5 @@ expletives : curriculum learning with fixed times
 guessed : base policy without wrapper
 Spengler : base policy with wrapper
 misplaces : curriculum learning v2
+
+Allegra : servo policy

@@ -46,10 +46,35 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         self.truncated = 0
         self.max_steps = 3000
         self.force_schedule = [[0,0,0],[0,0,0],[0,0,0]]
+        self.nb_servos = 6
+        self.servos = list(self.action_space.keys())
         print(self.observation_space)
         print(self.action_space)
+        self.action_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(self.nb_servos,))
+        self.observation_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(2*self.nb_servos,))
 
         
+
+    def convert_obs(self,obs):
+        new_observation = []
+        for i in self.servos:
+            new_observation.append(obs[i]["position"]/6)
+            new_observation.append(obs[i]["velocity"]/20)
+        return np.array(new_observation).flatten()
+
+
+    def convert_act(self,act):
+        action = {}
+        for i in range(self.nb_servos) :
+            action_servo = {
+                    "position": 0,
+                    "velocity": act[i]*20,
+                    "kp_scale": 0,
+                    "kd_scale": 0.5,
+                    }
+            action[self.servos[i]] = action_servo
+
+        return action
 
 
     def reset(self, **kwargs):
@@ -60,21 +85,21 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
             print("truncated ! ")
         else: print("resisted")
         obs, info = self.env.reset(**kwargs)
+        obs = self.convert_obs(obs)
         return obs, info
+
     
-        self.env.bullet_extra(bullet_action)
 
     def step(self, action):
         """
         Execute a step in the environment and modify the results if needed.
         """
         
+        action = self.convert_act(action)
         obs, reward, done, truncated, info = self.env.step(action)
-
+        obs = self.convert_obs(obs)
 
         self.count += 1
-        self.counttotal+=1
-        self.truncated = done
         return obs, reward, done, truncated, info
     
     def modify_reward(self, reward):
