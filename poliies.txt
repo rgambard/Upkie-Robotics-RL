@@ -6,3 +6,4 @@ Spengler : base policy with wrapper
 misplace : curiculum learning v2 with longer episodes
 
 Murdoch : servo policy
+awakens : servo policy v2
