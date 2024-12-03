@@ -50,6 +50,8 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         self.servos = list(self.action_space.keys())
         print(self.observation_space)
         print(self.action_space)
+        self.obs_reg = np.ones((2*self.nb_servos,))*0.1
+        self.obs_reg = np.array([ 1, 14,  2, 16, 10, 22,  1, 16,  2, 18, 13, 31.0])
         self.action_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(self.nb_servos,))
         self.observation_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(2*self.nb_servos,))
 
@@ -58,9 +60,11 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
     def convert_obs(self,obs):
         new_observation = []
         for i in self.servos:
-            new_observation.append(obs[i]["position"]/6)
-            new_observation.append(obs[i]["velocity"]/20)
-        return np.array(new_observation).flatten()
+            new_observation.append(obs[i]["position"])
+            new_observation.append(obs[i]["velocity"])
+        obs = np.array(new_observation).flatten()
+        obs = obs/self.obs_reg # all values should be in the [-1,1] range
+        return obs
 
 
     def convert_act(self,act):
@@ -81,11 +85,9 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         """
         Reset the environment and modify the initial observation if needed.
         """
-        if not self.truncated:
-            print("truncated ! ")
-        else: print("resisted")
         obs, info = self.env.reset(**kwargs)
         obs = self.convert_obs(obs)
+        self.count = 0
         return obs, info
 
     
@@ -98,16 +100,15 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         action = self.convert_act(action)
         obs, reward, done, truncated, info = self.env.step(action)
         obs = self.convert_obs(obs)
-
+        body_height = info['spine_observation']['sim']['base']['position'][2]
+        if body_height<0.35: # we have fallen
+            print("fall ! ", self.count)
+            done = True
+        else:
+            reward = (body_height/0.70)**2
         self.count += 1
         return obs, reward, done, truncated, info
     
-    def modify_reward(self, reward):
-        """
-        Modify the reward before returning it.
-        Example: Apply a scaling factor.
-        """
-        return reward #self.count/(500*1000) # max reward is 1
 
 def parse_command_line_arguments() -> argparse.Namespace:
     """
