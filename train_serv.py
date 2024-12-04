@@ -45,12 +45,10 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         self.counttotal = 0
         self.truncated = 0
         self.max_steps = 3000
-        self.force_schedule = [[0,0,0],[0,0,0],[0,0,0]]
         self.nb_servos = 6
         self.servos = list(self.action_space.keys())
         print(self.observation_space)
         print(self.action_space)
-        self.obs_reg = np.ones((2*self.nb_servos,))*0.1
         self.obs_reg = np.array([ 1, 14,  2, 16, 10, 22,  1, 16,  2, 18, 13, 31.0])
         self.action_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(self.nb_servos,))
         self.observation_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(2*self.nb_servos,))
@@ -70,12 +68,20 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
     def convert_act(self,act):
         action = {}
         for i in range(self.nb_servos) :
-            action_servo = {
-                    "position": 0,
-                    "velocity": act[i]*20,
-                    "kp_scale": 0,
-                    "kd_scale": 0.5,
-                    }
+            if "wheel" in self.servos[i]:
+                action_servo = {
+                        "position": 0,
+                        "velocity": act[i]*111,
+                        "kp_scale": 0,
+                        "kd_scale": 0.5,
+                        }
+            else:
+                action_servo = {
+                        "position": 0,
+                        "velocity": act[i]*28,
+                        "kp_scale": 0,
+                        "kd_scale": 0.5,}
+             
             action[self.servos[i]] = action_servo
 
         return action
@@ -103,6 +109,7 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         body_height = info['spine_observation']['sim']['base']['position'][2]
         if body_height<0.35: # we have fallen
             print("fall ! ", self.count)
+            reward = -10
             done = True
         else:
             reward = (body_height/0.70)**2
