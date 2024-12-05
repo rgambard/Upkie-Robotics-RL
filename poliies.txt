@@ -8,3 +8,4 @@ misplace : curiculum learning v2 with longer episodes
 Murdoch : servo policy
 awakens : servo policy v2
 gestating: servo policies 2500 timesteps
+costumed : same but 5500 timesteps
