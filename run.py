@@ -120,8 +120,8 @@ def compute_mosfet(env: gym.Wrapper, policy) -> None:
 
     observations = []
     forces = []
-    forcemax = 0
-    forcemin = -20
+    forcemax = 21
+    forcemin = 0
     n_tries = 3
     successes = []
     for i in range(5):
@@ -217,10 +217,10 @@ def run_policy(env: gym.Wrapper, policy) -> None:
 
     observations = []
     forces = []
-    gain = np.array ([30.0 , 1.0 , 0.0 , 0.1])
+    gain = np.array ([20.0 , 1.0 , 1.0 , 0.1,0.])
     while True:
-        #action, _ = policy.predict(observation, deterministic=True)
-        action = gain.dot(observation.reshape((-1,)))
+        action, _ = policy.predict(observation, deterministic=True)
+        #action = np.clip(gain.dot(observation[-1].reshape((-1,))),-1,1)
         tip_position, tip_velocity = get_tip_state(observation[-1])
         env.unwrapped.log("action", action)
         env.unwrapped.log("observation", observation[-1])
@@ -237,6 +237,7 @@ def run_policy(env: gym.Wrapper, policy) -> None:
         forces.append(CURRENTFORCE)
         observations.append(observation[0][0:2])
         observation, reward, terminated, truncated, info = env.step(action)
+        print(info['spine_observation']['sim']['base']['position'])
 
         count+=1
         if terminated or truncated or count > 2000:
@@ -299,6 +300,7 @@ def main(policy_path: str, training: bool) -> None:
             verbose=0,
         )
         policy.set_parameters(policy_path)
+        policy.save(f"./final_converted.zip")
         #run_policy(env, policy)
         compute_mosfet(env, policy)
 
