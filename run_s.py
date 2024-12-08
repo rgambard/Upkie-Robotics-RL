@@ -12,6 +12,7 @@ from typing import Tuple
 
 import gin
 import gymnasium as gym
+import gymnasium as gymnasium
 import numpy as np
 import upkie.envs
 from envs_s import make_ppo_balancer_env
@@ -21,7 +22,8 @@ from upkie.utils.raspi import configure_agent_process, on_raspi
 from upkie.utils.robot_state import RobotState
 from upkie.utils.robot_state_randomization import RobotStateRandomization
 import matplotlib.pyplot as plt
-class VelocityEnvWrapper(gym.Wrapper):
+
+class VelocityEnvWrapper(gymnasium.Wrapper):
     """
     A custom wrapper for the velocity environment.
 
@@ -40,17 +42,21 @@ class VelocityEnvWrapper(gym.Wrapper):
         self.servos = list(self.action_space.keys())
         print(self.observation_space)
         print(self.action_space)
-        self.action_space = gym.spaces.Box(low=-1.0,high=1.0,shape=(self.nb_servos,))
-        self.observation_space = gym.spaces.Box(low=-1.0,high=1.0,shape=(2*self.nb_servos,))
+        self.obs_reg = np.ones((2*self.nb_servos,))*0.1
+        self.obs_reg = np.array([ 1, 14,  2, 16, 10, 22,  1, 16,  2, 18, 13, 31.0])
+        self.action_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(self.nb_servos,))
+        self.observation_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(2*self.nb_servos,))
 
         
 
     def convert_obs(self,obs):
         new_observation = []
         for i in self.servos:
-            new_observation.append(obs[i]["position"]/6)
-            new_observation.append(obs[i]["velocity"]/20)
-        return np.array(new_observation).flatten()
+            new_observation.append(obs[i]["position"])
+            new_observation.append(obs[i]["velocity"])
+        obs = np.array(new_observation).flatten()
+        obs = obs/self.obs_reg # all values should be in the [-1,1] range
+        return obs
 
 
     def convert_act(self,act):
@@ -71,11 +77,9 @@ class VelocityEnvWrapper(gym.Wrapper):
         """
         Reset the environment and modify the initial observation if needed.
         """
-        if not self.truncated:
-            print("truncated ! ")
-        else: print("resisted")
         obs, info = self.env.reset(**kwargs)
         obs = self.convert_obs(obs)
+        self.count = 0
         return obs, info
 
     
@@ -88,18 +92,15 @@ class VelocityEnvWrapper(gym.Wrapper):
         action = self.convert_act(action)
         obs, reward, done, truncated, info = self.env.step(action)
         obs = self.convert_obs(obs)
-
+        body_height = info['spine_observation']['sim']['base']['position'][2]
+        if body_height<0.35: # we have fallen
+            print("fall ! ", self.count)
+            done = True
+        else:
+            reward = (body_height/0.70)**2
         self.count += 1
         return obs, reward, done, truncated, info
     
-    def modify_reward(self, reward):
-        """
-        Modify the reward before returning it.
-        Example: Apply a scaling factor.
-        """
-        return reward #self.count/(500*1000) # max reward is 1
-
-
 def parse_command_line_arguments() -> argparse.Namespace:
     """
     Parse command line arguments.
@@ -129,7 +130,7 @@ def parse_command_line_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-FORCE = 9
+FORCE = 0
 CURRENTFORCE = 0
 upkie.envs.register()
 def parse_command_line_arguments() -> argparse.Namespace:
@@ -248,7 +249,7 @@ def compute_mosfet(env: gym.Wrapper, policy) -> None:
             count = 0
             observation, info = env.reset()
             while True:
-                action, _ = policy.predict(observation, deterministic=True)
+                action, _ = policy.predict(observation, deterministic=False)
                 tip_position, tip_velocity = get_tip_state(observation[-1])
                 env.unwrapped.log("action", action)
                 env.unwrapped.log("observation", observation[-1])
