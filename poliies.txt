@@ -8,4 +8,6 @@ misplace : curiculum learning v2 with longer episodes
 Murdoch : servo policy
 awakens : servo policy v2
 gestating: servo policies 2500 timesteps
-costumed : same but 5500 timesteps
+costumed : same but 5500 timesteps, with kl regs and very small eps
+rasped : simplified with no kl 7000 steps, 10 agents
+Titus :  1 agent 3000 steps max

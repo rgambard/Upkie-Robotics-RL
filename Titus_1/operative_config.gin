@@ -1,4 +1,4 @@
-import settings
+import setting_s
 
 # Parameters for EnvSettings:
 # ==============================================================================
@@ -19,25 +19,25 @@ EnvSettings.spine_frequency = 1000
 # Parameters for PPOSettings:
 # ==============================================================================
 PPOSettings.batch_size = 64
-PPOSettings.clip_range = 1
+PPOSettings.clip_range = 0.5
 PPOSettings.clip_range_vf = None
-PPOSettings.ent_coef = 0.0005
+PPOSettings.ent_coef = 0.0003
 PPOSettings.gae_lambda = 0.95
 PPOSettings.learning_rate = 0.0001
-PPOSettings.max_grad_norm = 0.5
-PPOSettings.n_epochs = 2
-PPOSettings.n_steps = 4096
+PPOSettings.max_grad_norm = 1.0
+PPOSettings.n_epochs = 10
+PPOSettings.n_steps = 32000
 PPOSettings.net_arch_pi = (64, 64)
 PPOSettings.net_arch_vf = (64, 64)
 PPOSettings.normalize_advantage = True
 PPOSettings.sde_sample_freq = -1
-PPOSettings.target_kl = 3e-05
+PPOSettings.target_kl = None
 PPOSettings.use_sde = False
 PPOSettings.vf_coef = 5
 
 # Parameters for TrainingSettings:
 # ==============================================================================
-TrainingSettings.init_rand = {'omega_y': 0.0, 'pitch': 0.0, 'v_x': 0.0}
-TrainingSettings.max_episode_duration = 45
+TrainingSettings.init_rand = {'omega_y': 0.1, 'pitch': 0.25, 'v_x': 0.1}
+TrainingSettings.max_episode_duration = 15
 TrainingSettings.return_horizon = 5.0
-TrainingSettings.total_timesteps = 10_000_000
+TrainingSettings.total_timesteps = 10000000
