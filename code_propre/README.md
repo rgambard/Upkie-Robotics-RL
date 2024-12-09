@@ -121,3 +121,99 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
 This is the wrapper for the best policy we had with a 10.3 N MSFOS. We compute a force schedule, given the time boundaries and the scales associated (see the reset method).
 
 After the training, we get a policy in the form of .zip file then we launch `compute_msfos_policy.py`.
+
+## Upkie Servos environment
+
+Here again, we need to redefine a few things : 
+
+```python
+class VelocityEnvWrapper(gymnasium.Wrapper):
+    """
+    A custom wrapper for the velocity environment.
+
+    This wrapper allows you to modify or log observations, rewards,
+    or interactions with the environment.
+    """
+    
+    def __init__(self, env):
+        super().__init__(env)
+        self.count = 0
+        self.truncated = 0
+        self.max_steps = 3000
+        self.nb_servos = 6
+        self.servos = list(self.action_space.keys())
+        print(self.observation_space)
+        print(self.action_space)
+        self.obs_reg = np.array([ 1, 14,  2, 16, 10, 22,  1, 16,  2, 18, 13, 31.0])
+        self.action_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(self.nb_servos,))
+        self.observation_space = gymnasium.spaces.Box(low=-1.0,high=1.0,shape=(2*self.nb_servos,))
+
+        
+
+    def convert_obs(self,obs):
+        new_observation = []
+        for i in self.servos:
+            new_observation.append(obs[i]["position"])
+            new_observation.append(obs[i]["velocity"])
+        obs = np.array(new_observation).flatten()
+        obs = obs/self.obs_reg # all values should be in the [-1,1] range
+        return obs
+
+
+    def convert_act(self,act):
+        action = {}
+        for i in range(self.nb_servos) :
+            if "wheel" in self.servos[i]:
+                action_servo = {
+                        "position": 0,
+                        "velocity": act[i]*111,
+                        "kp_scale": 0,
+                        "kd_scale": 0.5,
+                        }
+            else:
+                action_servo = {
+                        "position": 0,
+                        "velocity": act[i]*28,
+                        "kp_scale": 0,
+                        "kd_scale": 0.5,}
+             
+            action[self.servos[i]] = action_servo
+
+        return action
+
+
+    def reset(self, **kwargs):
+        """
+        Reset the environment and modify the initial observation if needed.
+        """
+        obs, info = self.env.reset(**kwargs)
+        obs = self.convert_obs(obs)
+        self.count = 0
+        return obs, info
+
+    
+
+    def step(self, action):
+        """
+        Execute a step in the environment and modify the results if needed.
+        """
+        
+        action = self.convert_act(action)
+        obs, reward, done, truncated, info = self.env.step(action)
+        obs = self.convert_obs(obs)
+        body_height = info['spine_observation']['sim']['base']['position'][2]
+        if body_height<0.35: # we have fallen
+            print("fall ! ", self.count)
+            reward = -10
+            done = True
+        else:
+            reward = (body_height/0.70)**2
+        self.count += 1
+        return obs, reward, done, truncated, info
+```
+
+Let us explain some part of the code. First of all, the observations are now a bunch of parameters (position, velocity, torque etc...) for each servomotor. Each of these parameters have certain inf and sup boundaries. Therefore, we decided to normalize all of them using the `self.obs_reg` to assure that each observation is bounded between $[-1;1]$. That is the function of the methods `convert_act` and `convert_obs`.
+
+Another thing we changed is the reward given the height of the body. Indeed, when we did a try without this change of reward, and the body just touched the floor with its knees, so this change of reward keep it above the floor.
+
+Lastly, we put the file `settings_servos.gin` where we specifically changed `PPOSettings.clip_range = 0.05` and also the random initiations to help the training.
