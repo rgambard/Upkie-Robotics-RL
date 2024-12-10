@@ -20,8 +20,39 @@ from stable_baselines3 import PPO
 from upkie.utils.raspi import configure_agent_process, on_raspi
 from upkie.utils.robot_state import RobotState
 from upkie.utils.robot_state_randomization import RobotStateRandomization
+import matplotlib.pyplot as plt
 
+FORCE = 9
+CURRENTFORCE = 0
 upkie.envs.register()
+def parse_command_line_arguments() -> argparse.Namespace:
+    """
+    Parse command line arguments.
+
+    Returns:
+        Command-line arguments.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--name",
+        default="",
+        type=str,
+        help="name of the new policy to train",
+    )
+    parser.add_argument(
+        "--nb-envs",
+        default=1,
+        type=int,
+        help="number of parallel simulation processes to run",
+    )
+    parser.add_argument(
+        "--show",
+        default=False,
+        action="store_true",
+        help="show simulator during trajectory rollouts",
+    )
+    return parser.parse_args()
+
 
 
 def parse_command_line_arguments() -> argparse.Namespace:
@@ -55,7 +86,7 @@ def get_tip_state(
 
     @param observation Observation vector.
     @param tip_height Height of the virtual tip.
-    @returns Pair of tip (position, velocity) in the sagittal plane.
+    @returns Pair of tip (position, velocity) in the sagittal planeg
     """
     pitch = observation[0]
     ground_position = observation[1]
@@ -67,8 +98,7 @@ def get_tip_state(
     )
     return tip_position, tip_velocity
 
-
-def run_policy(env: gym.Wrapper, policy) -> None:
+def compute_mosfet(env: gym.Wrapper, policy) -> None:
     """!
     Run the policy on a given environment.
 
@@ -78,17 +108,156 @@ def run_policy(env: gym.Wrapper, policy) -> None:
     action = np.zeros(env.action_space.shape)
     observation, info = env.reset()
     reward = 0.0
+    bullet_no_action = {
+            "external_forces": {
+                "torso": {
+                    "force": np.array([0.,0.,0.0]),
+                    "local": False,
+                }
+            }
+        }
+
+
+    observations = []
+    forces = []
+    forcemax = 20
+    forcemin = 0
+    n_tries = 6
+    gain = np.array([20,1.0,1.0,0, 0])
+    successes = []
+    for i in range(6):
+        nbsuccess = 0
+        force = forcemax+forcemin
+        force /= 2
+        bullet_action = {
+            "external_forces": {
+                "torso": {
+                    "force": np.array([force,0.0,0]),
+                    "local": False,
+                }
+            }
+        }
+
+        for n in range(n_tries):
+            count = 0
+            observation, info = env.reset()
+            print("applying force !!!", force)
+            while True:
+                #action, _ = policy.predict(observation, deterministic=True)
+                action = np.clip(gain.dot(observation[-1]),-1,1)
+                tip_position, tip_velocity = get_tip_state(observation[-1])
+                env.unwrapped.log("action", action)
+                env.unwrapped.log("observation", observation[-1])
+                env.unwrapped.log("reward", reward)
+                env.unwrapped.log("tip_position", tip_position)
+                env.unwrapped.log("tip_velocity", tip_velocity)
+                if count>300 and count < 500:
+                    env.bullet_extra(bullet_action)
+                else:
+                    env.bullet_extra(bullet_no_action)
+                observation, reward, terminated, truncated, info = env.step(action)
+
+                count+=1
+                if count > 2000:
+                    print("success")
+                    nbsuccess +=1
+                    break
+
+                if terminated or truncated:
+                    break
+
+        if nbsuccess<=4:
+            forcemax = force
+        else:
+            forcemin=  force
+        print(forcemin,forcemax, nbsuccess)
+            
+        successes.append(nbsuccess/n_tries)
+        forces.append(force)
+
+    forces=  np.array(forces)
+    successes = np.array(successes)
+    sorted_indices = np.argsort(forces)
+    forces = forces[sorted_indices]
+    successes = successes[sorted_indices]
+    #plt.title("MSFOS simulation for linear policy")
+    #plt.plot(forces,successes, label = "proportion of successes for each force applied")
+    #plt.xlabel("sagital force applied (N)")
+    #plt.ylabel("proportion of success")
+    #plt.legend()
+    #plt.show()
+    print(forces)
+    print(successes)
+
+
+def run_policy(env: gym.Wrapper, policy) -> None:
+    """!
+    Run the policy on a given environment.
+
+    @param env Upkie environment, wrapped by the agent.
+    @param policy MLP policy to follow.
+    """
+    global FORCE, CURRENTFORCE
+    action = np.zeros(env.action_space.shape)
+    observation, info = env.reset()
+    reward = 0.0
+    bullet_no_action = {
+            "external_forces": {
+                "torso": {
+                    "force": np.array([0.,0.,0.0]),
+                    "local": False,
+                }
+            }
+        }
+
+    bullet_action = {
+            "external_forces": {
+                "torso": {
+                    "force": np.array([FORCE,0,0]),
+                    "local": False,
+                }
+            }
+        }
+    count = 0
+
+    observations = []
+    forces = []
+    gain = np.array ([20.0 , 1.0 , 1.0 , 0.1,0.])
     while True:
         action, _ = policy.predict(observation, deterministic=True)
+        #action = np.clip(gain.dot(observation[-1].reshape((-1,))),-1,1)
         tip_position, tip_velocity = get_tip_state(observation[-1])
         env.unwrapped.log("action", action)
         env.unwrapped.log("observation", observation[-1])
         env.unwrapped.log("reward", reward)
         env.unwrapped.log("tip_position", tip_position)
         env.unwrapped.log("tip_velocity", tip_velocity)
+        if count>300 and count < 500:
+            print("applying force !!!")
+            env.bullet_extra(bullet_action)
+            CURRENTFORCE = FORCE
+        else:
+            CURRENTFORCE = 0
+            env.bullet_extra(bullet_no_action)
+        forces.append(CURRENTFORCE)
+        observations.append(observation[0][0:2])
         observation, reward, terminated, truncated, info = env.step(action)
-        if terminated or truncated:
+        print(info['spine_observation']['sim']['base']['position'])
+
+        count+=1
+        if terminated or truncated or count > 2000:
+            break
+            count = 0
             observation, info = env.reset()
+    time = np.arange(len(observations))*1/200
+    observations = np.array(observations)
+    forces=  np.array(forces)
+    plt.title("MSFOS simulation for base ppo policy")
+    plt.plot(time,observations[:,0], label = "angle (rad)")
+    plt.plot(time,observations[:,1], label = "position (m)")
+    plt.plot(time,forces/10, label="force ( 1 unit = 10 N )  applied")
+    plt.legend()
+    plt.show()
 
 
 def main(policy_path: str, training: bool) -> None:
@@ -99,6 +268,7 @@ def main(policy_path: str, training: bool) -> None:
     @param training If True, add training noise and domain randomization.
     """
     env_settings = EnvSettings()
+
     init_state = None
     if training:
         training_settings = TrainingSettings()
@@ -120,6 +290,8 @@ def main(policy_path: str, training: bool) -> None:
             env_settings,
             training=training,
         )
+
+         
         ppo_settings = PPOSettings()
         policy = PPO(
             "MlpPolicy",
@@ -133,7 +305,9 @@ def main(policy_path: str, training: bool) -> None:
             verbose=0,
         )
         policy.set_parameters(policy_path)
-        run_policy(env, policy)
+        policy.save(f"./final_converted.zip")
+        #run_policy(env, policy)
+        compute_mosfet(env, policy)
 
 
 if __name__ == "__main__":
