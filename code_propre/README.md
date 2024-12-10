@@ -212,8 +212,8 @@ class VelocityEnvWrapper(gymnasium.Wrapper):
         return obs, reward, done, truncated, info
 ```
 
-Let us explain some part of the code. First of all, the observations are now a bunch of parameters (position, velocity, torque etc...) for each servomotor. Each of these parameters have certain inf and sup boundaries. Therefore, we decided to normalize all of them using the `self.obs_reg` to assure that each observation is bounded between $[-1;1]$. That is the function of the methods `convert_act` and `convert_obs`.
+Let us explain some part of the code. First of all, the observations are now a bunch of parameters (position, velocity, torque etc...) for each servomotor. Each of these parameters have certain inf and sup boundaries. Therefore, we decided to normalize all of them using the `self.obs_reg` to assure that each observation is bounded between $[-1;1]$. That is the utility of the methods `convert_act` and `convert_obs`.
 
 Another thing we changed is the reward given the height of the body. Indeed, when we did a try without this change of reward, and the body just touched the floor with its knees, so this change of reward keep it above the floor.
 
-Lastly, we put the file `settings_servos.gin` where we specifically changed `PPOSettings.clip_range = 0.05` and also the random initiations to help the training.
+Lastly, we put the file `settings_servos.gin` where we specifically changed `PPOSettings.clip_range = 0.05`, the total number of steps `TrainingSettings.total_timesteps = 5_000_000` and also the random initializations to help the training.
