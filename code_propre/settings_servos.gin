@@ -44,9 +44,9 @@ PPOSettings.use_sde = False
 PPOSettings.vf_coef = 0.5
 
 TrainingSettings.init_rand = {
-    "pitch": 0.0,
-    "v_x": 0.0,
-    "omega_y": 0.0,
+    "pitch": 0.25,
+    "v_x": 0.1,
+    "omega_y": 0.1,
 }
 TrainingSettings.max_episode_duration = 15
 TrainingSettings.return_horizon = 5.0

@@ -177,7 +177,7 @@ def parse_command_line_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--training",
-        default=False,
+        default=True,
         action="store_true",
         help="add noise and actuation lag, as in training",
     )
@@ -374,11 +374,11 @@ def main(policy_path: str, training: bool) -> None:
     init_state = None
     if training:
         training_settings = TrainingSettings()
-        init_state = RobotState(
-            randomization=RobotStateRandomization(
-                **training_settings.init_rand
-            ),
-        )
+        #init_state = RobotState(
+        #    randomization=RobotStateRandomization(
+        #        **training_settings.init_rand
+        #    ),
+        #)
     with gym.make(
         env_settings.env_id,
         frequency=env_settings.agent_frequency,
