@@ -217,3 +217,10 @@ Let us explain some part of the code. First of all, the observations are now a b
 Another thing we changed is the reward given the height of the body. Indeed, when we did a try without this change of reward, and the body just touched the floor with its knees, so this change of reward keep it above the floor.
 
 Lastly, we put the file `settings_servos.gin` where we specifically changed `PPOSettings.clip_range = 0.05`, the total number of steps `TrainingSettings.total_timesteps = 5_000_000` and also the random initializations to help the training.
+
+## Policies
+
+In the folder policies/, you may find the three policies we trained for this project
+* The base policy we trained with nothing added (no wrapper)
+* The curriculum learning policy
+* The servos policy
